@@ -1,0 +1,4 @@
+<launch>
+    <node pkg="asa_ros_commander" name="talker.py" type="talker.py" output="screen"/>
+    <node pkg="asa_ros_commander" name="listener.py" type="listener.py" output="screen"/>
+</launch>
