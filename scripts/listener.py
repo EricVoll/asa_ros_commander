@@ -38,9 +38,10 @@
 
 import rospy
 from std_msgs.msg import String
+from asa_ros_commander.msg import AsaRelPoseStamped
 
 def callback(data):
-    rospy.loginfo(rospy.get_caller_id() + 'I heard %s', data.data)
+    rospy.loginfo(rospy.get_caller_id() + 'I heard %s', data.anchor_id)
 
 def listener():
 
@@ -51,7 +52,7 @@ def listener():
     # run simultaneously.
     rospy.init_node('listener', anonymous=True)
 
-    rospy.Subscriber('chatter', String, callback)
+    rospy.Subscriber('anchoredPose', AsaRelPoseStamped, callback)
 
     # spin() simply keeps python from exiting until this node is stopped
     rospy.spin()
