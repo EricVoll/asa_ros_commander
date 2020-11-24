@@ -45,10 +45,6 @@ import time
 
 class AsaCommander:
 
-    #current_anchor_id = "odom"
-    #tf_broadcaster = None
-    #tf_listener = None
-    #odom_publisher = None
 
     def __init__(self):
         rospy.init_node('asa_commander', anonymous=True)
@@ -70,6 +66,7 @@ class AsaCommander:
     def spin(self):
         rospy.spin()
 
+    # transforms a post to a transform object
     def pose_to_tf(self, pose, frame_name, parent_frame, time=None):
         """
         Generate a TF from a given pose, frame, and parent.
@@ -100,6 +97,7 @@ class AsaCommander:
         self.set_current_asa_frame(data.anchor_id)
 
 
+    # Adds an anchor to the anchor list and overwrites the default if none is set
     def set_current_asa_frame(self, anchor_id):
         #overwrite the default the first time we receive an anchor
         if self.current_anchor_id == "odom":
@@ -108,6 +106,7 @@ class AsaCommander:
             self.anchors.append(anchor_id)
             rospy.loginfo("added id " + anchor_id + " to anchor list")
 
+    # Republishes the received omodemetry relative to the odom frame but relative to the nearest anchor available
     def republish_robot_pos(self, data):
         current_parent_frame_id = data.header.frame_id
         child_frame_id = data.child_frame_id
@@ -141,6 +140,7 @@ class AsaCommander:
 
         self.odom_publisher.publish(new_odom)
 
+    # finds the nearest anchor to the base_link frame
     def find_nearest_anchor(self):
 
         if(len(self.anchors) == 1):
@@ -157,6 +157,7 @@ class AsaCommander:
         rospy.loginfo("Smallest distance is: %s" , smallestDistance)
         return smallestDistanceAnchor
 
+    # returns the distance between the two frames
     def getDistanceToAnchor(self, anchor_id, target_frame):
         trans = self.tf_Buffer.lookup_transform(target_frame, anchor_id, rospy.Time(0))
         tr = trans.transform.translation
