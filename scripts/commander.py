@@ -12,6 +12,9 @@ from asa_ros_commander.msg import AsaRelPoseStamped
 from asa_ros_commander.msg import CreatedAnchorMock as CreatedAnchor
 from asa_ros_commander.msg import FoundAnchorMock as FoundAnchor
 import time
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+import actionlib
+from actionlib import GoalID
 
 class AsaCommander:
 
@@ -32,6 +35,7 @@ class AsaCommander:
         # All publishers
         self.odom_publisher = rospy.Publisher('/odometry/filtered/asa_relative', Odometry, queue_size=10)
         self.move_base_simple_publisher = None
+        self.move_base_cancel_publisher = None
         
         #add all subscribers needed
         rospy.Subscriber('/anchored_goal', AsaRelPoseStamped, self.anchored_goal_callback)
@@ -149,11 +153,14 @@ class AsaCommander:
             rospy.wait_for_service('')
             rospy.ServiceProxy('')
         elif (self.robot_used == "jackal"):
-            # use movebase simple goal publisher
+            ## use movebase simple goal publisher
             if(self.move_base_simple_publisher == None):
                 self.move_base_simple_publisher = rospy.Publisher('move_base_simple/goal', PoseStamped, queue_size=10)
+                self.move_base_cancel_publisher = rospy.Publisher('move_base/cancel', GoalID, queue_size=10)
 
             # create StampedPose from transform
+            self.move_base_cancel_publisher.publish(GoalID())
+            rospy.sleep(.1)
             stamped_pose = PoseStamped()
             stamped_pose.header.frame_id = self.root_frame
             stamped_pose.pose.position.x = trans.transform.translation.x
@@ -164,6 +171,29 @@ class AsaCommander:
             stamped_pose.pose.orientation.z = trans.transform.rotation.z
             stamped_pose.pose.orientation.w = trans.transform.rotation.w
             self.move_base_simple_publisher.publish(stamped_pose)
+            
+            #client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+            #client.wait_for_server()
+            #goal = MoveBaseGoal()
+            #goal.target_pose.header.frame_id = self.root_frame
+            #goal.target_pose.header.stamp = rospy.Time.now()
+#
+            #goal.target_pose.pose.position.x = trans.transform.translation.x
+            #goal.target_pose.pose.position.y = trans.transform.translation.y
+            ##goal.target_pose.pose.position.z = trans.transform.translation.z
+            ##goal.target_pose.pose.orientation.x = trans.transform.rotation.x
+            ##goal.target_pose.pose.orientation.y = trans.transform.rotation.y
+            ##goal.target_pose.pose.orientation.z = trans.transform.rotation.z
+            #goal.target_pose.pose.orientation.w = 1 # trans.transform.rotation.w
+#
+            #self.move_base_cancel_publisher.publish(GoalID())
+            #self.rate.sleep()
+            #client.send_goal(goal)
+            #wait = client.wait_for_result()
+            #if not wait:
+            #    rospy.logerr("Action server not available")
+            #else: 
+            #    rospy.loginfo("Successfully sent the goal")
 
 
     # Republishes the received omodemetry relative to the odom frame but relative to the nearest anchor available
