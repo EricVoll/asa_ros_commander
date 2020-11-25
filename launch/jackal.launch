@@ -3,7 +3,7 @@
     <arg name="start_spot" default="false" />
     <arg name="start_jackal" default="true" />
 
-    <node pkg="asa_ros_commander" name="asa_ros_talker" type="talker.py" output="screen"/>
+    <node pkg="asa_ros_commander" name="asa_ros_mocker" type="asa_mocker.py" output="screen"/>
     <node pkg="asa_ros_commander" name="asa_ros_commander" type="commander.py" output="screen"/>
     
     <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" />
