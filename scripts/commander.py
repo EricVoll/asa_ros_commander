@@ -6,7 +6,7 @@
 import rospy
 import tf2_ros as tf
 from std_msgs.msg import String
-from geometry_msgs.msg import TransformStamped, Quaternion
+from geometry_msgs.msg import TransformStamped, Quaternion, PoseStamped
 from nav_msgs.msg import Odometry
 from asa_ros_commander.msg import AsaRelPoseStamped
 from asa_ros_commander.msg import CreatedAnchorMock as CreatedAnchor
@@ -20,12 +20,19 @@ class AsaCommander:
         rospy.init_node('asa_commander', anonymous=True)
         self.tf_Buffer = tf.Buffer(rospy.Duration(10))
         self.tf_listener = tf.TransformListener(self.tf_Buffer)
-        self.odom_publisher = rospy.Publisher('/odometry/filtered/asa_relative', Odometry, queue_size=10)
-        self.current_anchor_id = "odom"
+        self.tf_broadcaster = tf.TransformBroadcaster()
+        self.root_frame = "odom"
+        self.current_anchor_id = self.root_frame
         self.rate = rospy.Rate(10.0)
         self.anchors = []
         self.robot_frame = "base_link"
 
+        self.robot_used = "jackal" # {"jackal", "spot"} mainly has influence on which mechanism is used to re-publish the received goal
+        
+        # All publishers
+        self.odom_publisher = rospy.Publisher('/odometry/filtered/asa_relative', Odometry, queue_size=10)
+        self.move_base_simple_publisher = None
+        
         #add all subscribers needed
         rospy.Subscriber('/anchored_goal', AsaRelPoseStamped, self.anchored_goal_callback)
         rospy.Subscriber('/odometry/filtered', Odometry, self.republish_robot_pos)
@@ -43,6 +50,24 @@ class AsaCommander:
 # Utils #
 #########
 
+    # transforms a post to a transform object
+    def pose_to_tf(self, pose, frame_name, parent_frame, time=None):
+        """
+        Generate a TF from a given pose, frame, and parent.
+        """
+        assert pose is not None, 'Cannot have None for pose.'
+        _tf = TransformStamped()
+        
+        _tf.child_frame_id = frame_name
+        if time is None:
+            time = rospy.Time.now()
+        _tf.header.stamp = time
+        _tf.header.frame_id = parent_frame
+
+        _tf.transform.translation = pose.position
+        _tf.transform.rotation = pose.orientation
+
+        return _tf
 
 #####################
 # Anchor management #
@@ -63,8 +88,13 @@ class AsaCommander:
 
     # Adds an anchor to the anchor list and overwrites the default if none is set
     def add_asa_frame(self, anchor_id):
+
+        if(anchor_id == "mocked_0"):
+            #reset the list
+            self.anchors = []
+
         #overwrite the default the first time we receive an anchor
-        if self.current_anchor_id == "odom":
+        if self.current_anchor_id == self.root_frame:
             self.current_anchor_id = anchor_id
         if anchor_id not in self.anchors:
             self.anchors.append(anchor_id)
@@ -100,6 +130,41 @@ class AsaCommander:
     def anchored_goal_callback(self, data):
         rospy.loginfo(rospy.get_caller_id() + ' Commanding robot relative to the anchor with id %s', data.anchor_id)
 
+        # create current target frame
+        current_goal_frame_id = "current_goal"
+        transform = self.pose_to_tf(data.pose, current_goal_frame_id, data.anchor_id)
+        self.tf_broadcaster.sendTransform(transform)
+
+        # lookup transform to odom
+        try:
+            trans = self.tf_Buffer.lookup_transform(self.root_frame, current_goal_frame_id, rospy.Time(0), rospy.Duration(3))
+            rospy.loginfo("found tf: %s", trans)
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            rospy.loginfo("Failed to lookup anchor for anchored goal once.")
+            return
+
+        # republish the StampedPose relative to the base frame
+        if(self.robot_used == "spot"):
+            # use spot wrapper trajectory service
+            rospy.wait_for_service('')
+            rospy.ServiceProxy('')
+        elif (self.robot_used == "jackal"):
+            # use movebase simple goal publisher
+            if(self.move_base_simple_publisher == None):
+                self.move_base_simple_publisher = rospy.Publisher('move_base_simple/goal', PoseStamped, queue_size=10)
+
+            # create StampedPose from transform
+            stamped_pose = PoseStamped()
+            stamped_pose.header.frame_id = self.root_frame
+            stamped_pose.pose.position.x = trans.transform.translation.x
+            stamped_pose.pose.position.y = trans.transform.translation.y
+            stamped_pose.pose.position.z = trans.transform.translation.z
+            stamped_pose.pose.orientation.x = trans.transform.rotation.x
+            stamped_pose.pose.orientation.y = trans.transform.rotation.y
+            stamped_pose.pose.orientation.z = trans.transform.rotation.z
+            stamped_pose.pose.orientation.w = trans.transform.rotation.w
+            self.move_base_simple_publisher.publish(stamped_pose)
+
 
     # Republishes the received omodemetry relative to the odom frame but relative to the nearest anchor available
     def republish_robot_pos(self, data):
@@ -107,7 +172,7 @@ class AsaCommander:
         child_frame_id = data.child_frame_id
 
         if(current_parent_frame_id == self.current_anchor_id):
-            #rospy.loginfo("Skipped republishing since current anchor id "+ self.current_anchor_id + " is same as sent parent")
+            rospy.loginfo("Skipped republishing since current anchor id "+ self.current_anchor_id + " is same as sent parent")
             return
 
         self.current_anchor_id = self.find_nearest_anchor()
@@ -115,7 +180,7 @@ class AsaCommander:
         #Lookup the transform relative to the 
         try:
             #lookup takes about .1ms
-            trans = self.tf_Buffer.lookup_transform(child_frame_id, self.current_anchor_id, rospy.Time(0))
+            trans = self.tf_Buffer.lookup_transform(self.current_anchor_id, child_frame_id, rospy.Time(0))
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             self.rate.sleep()
             rospy.loginfo("failed once")
@@ -128,7 +193,10 @@ class AsaCommander:
         new_odom.pose.pose.position.x = trans.transform.translation.x
         new_odom.pose.pose.position.y = trans.transform.translation.y
         new_odom.pose.pose.position.z = trans.transform.translation.z
-        new_odom.pose.pose.orientation = Quaternion()
+        new_odom.pose.pose.orientation.x = trans.transform.rotation.x
+        new_odom.pose.pose.orientation.y = trans.transform.rotation.y
+        new_odom.pose.pose.orientation.z = trans.transform.rotation.z
+        new_odom.pose.pose.orientation.w = trans.transform.rotation.w
         new_odom.pose.covariance = data.pose.covariance #We are no using covariance at all. Maybe do not set it?
 
         rospy.loginfo("Republished odom relative to " + self.current_anchor_id + "!")
