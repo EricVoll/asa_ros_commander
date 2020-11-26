@@ -163,6 +163,7 @@ include_directories(
  catkin_install_python(PROGRAMS
    scripts/commander.py
    scripts/asa_mocker.py
+   scripts/clock_publisher.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 

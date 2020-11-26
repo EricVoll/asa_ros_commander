@@ -1,0 +1,14 @@
+<launch>
+	<!--<param name="/use_sim_time" value="true" />-->
+    <!--Spot-->
+    <include file="$(find spot_driver)/launch/driver.launch"/>
+    
+	<node name="file_server" pkg="file_server" type="file_server" output="screen" />
+
+    <node pkg="asa_ros_commander" name="asa_ros_mocker" type="asa_mocker.py" output="screen"/>
+    <node pkg="asa_ros_commander" name="asa_ros_commander" type="commander.py" output="screen"/>
+    <node pkg="asa_ros_commander" name="asa_ros_clock_publisher" type="clock_publisher.py" output="screen"/>
+    
+    <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" />
+
+</launch>

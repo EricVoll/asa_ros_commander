@@ -13,6 +13,7 @@ from asa_ros_commander.msg import CreatedAnchorMock as CreatedAnchor
 from asa_ros_commander.msg import FoundAnchorMock as FoundAnchor
 import time
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from spot_msgs.srv import Trajectory, TrajectoryResponse
 import actionlib
 from actionlib import GoalID
 
@@ -28,9 +29,14 @@ class AsaCommander:
         self.current_anchor_id = self.root_frame
         self.rate = rospy.Rate(10.0)
         self.anchors = []
-        self.robot_frame = "base_link"
+        
+        self.robot_used = "spot" # {"jackal", "spot"} mainly has influence on which mechanism is used to re-publish the received goal
+        
+        if(self.robot_used == "jackal"):
+            self.robot_frame = "base_link"
+        elif(self.robot_used =="spot"):
+            self.robot_frame = "body"
 
-        self.robot_used = "jackal" # {"jackal", "spot"} mainly has influence on which mechanism is used to re-publish the received goal
         
         # All publishers
         self.odom_publisher = rospy.Publisher('/odometry/filtered/asa_relative', Odometry, queue_size=10)
@@ -39,7 +45,10 @@ class AsaCommander:
         
         #add all subscribers needed
         rospy.Subscriber('/anchored_goal', AsaRelPoseStamped, self.anchored_goal_callback)
-        rospy.Subscriber('/odometry/filtered', Odometry, self.republish_robot_pos)
+        if(self.robot_used =="jackal"):
+            rospy.Subscriber('/odometry/filtered', Odometry, self.republish_robot_pos)
+        elif(self.robot_used == "spot"):
+            rospy.Subscriber('spot/odometry', Odometry, self.republish_robot_pos)
 
         # Subscribers listening to the asa ros wrapper
         rospy.Subscriber('/found_anchor', FoundAnchor, self.asa_found_anchor_callback)
@@ -139,19 +148,48 @@ class AsaCommander:
         transform = self.pose_to_tf(data.pose, current_goal_frame_id, data.anchor_id)
         self.tf_broadcaster.sendTransform(transform)
 
+        target_frame = self.root_frame
+        if(self.robot_used == "spot"):
+            target_frame = self.robot_frame # spot interprets commands realtive to the body.
+
         # lookup transform to odom
         try:
-            trans = self.tf_Buffer.lookup_transform(self.root_frame, current_goal_frame_id, rospy.Time(0), rospy.Duration(3))
+            trans = self.tf_Buffer.lookup_transform(target_frame, current_goal_frame_id, rospy.Time(0), rospy.Duration(3))
             rospy.loginfo("found tf: %s", trans)
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             rospy.loginfo("Failed to lookup anchor for anchored goal once.")
             return
 
+            
+        target_pose = PoseStamped()
+        target_pose.header.frame_id = self.root_frame
+        target_pose.pose.position.x = trans.transform.translation.x
+        target_pose.pose.position.y = trans.transform.translation.y
+        target_pose.pose.position.z = trans.transform.translation.z
+        target_pose.pose.orientation.x = trans.transform.rotation.x
+        target_pose.pose.orientation.y = trans.transform.rotation.y
+        target_pose.pose.orientation.z = trans.transform.rotation.z
+        target_pose.pose.orientation.w = trans.transform.rotation.w
+
         # republish the StampedPose relative to the base frame
         if(self.robot_used == "spot"):
             # use spot wrapper trajectory service
-            rospy.wait_for_service('')
-            rospy.ServiceProxy('')
+
+            # build trajectory command
+            rospy.loginfo("Marked goal. Sleep.")
+            rospy.sleep(4)
+            rospy.loginfo("Starting command.")
+            trajectory = Trajectory()
+            trajectory.target_pose = target_pose
+            trajectory.target_pose.header.frame_id = "body"
+            trajectory.duration = 15
+            
+            rospy.wait_for_service('spot/trajectory')
+            trajectory_service = rospy.ServiceProxy('spot/trajectory', Trajectory)
+            response = trajectory_service(trajectory.target_pose, trajectory.duration)
+            rospy.loginfo(response.success)
+            rospy.loginfo(response.message)
+
         elif (self.robot_used == "jackal"):
             ## use movebase simple goal publisher
             if(self.move_base_simple_publisher == None):
@@ -161,39 +199,8 @@ class AsaCommander:
             # create StampedPose from transform
             self.move_base_cancel_publisher.publish(GoalID())
             rospy.sleep(.1)
-            stamped_pose = PoseStamped()
-            stamped_pose.header.frame_id = self.root_frame
-            stamped_pose.pose.position.x = trans.transform.translation.x
-            stamped_pose.pose.position.y = trans.transform.translation.y
-            stamped_pose.pose.position.z = trans.transform.translation.z
-            stamped_pose.pose.orientation.x = trans.transform.rotation.x
-            stamped_pose.pose.orientation.y = trans.transform.rotation.y
-            stamped_pose.pose.orientation.z = trans.transform.rotation.z
-            stamped_pose.pose.orientation.w = trans.transform.rotation.w
-            self.move_base_simple_publisher.publish(stamped_pose)
-            
-            #client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
-            #client.wait_for_server()
-            #goal = MoveBaseGoal()
-            #goal.target_pose.header.frame_id = self.root_frame
-            #goal.target_pose.header.stamp = rospy.Time.now()
-#
-            #goal.target_pose.pose.position.x = trans.transform.translation.x
-            #goal.target_pose.pose.position.y = trans.transform.translation.y
-            ##goal.target_pose.pose.position.z = trans.transform.translation.z
-            ##goal.target_pose.pose.orientation.x = trans.transform.rotation.x
-            ##goal.target_pose.pose.orientation.y = trans.transform.rotation.y
-            ##goal.target_pose.pose.orientation.z = trans.transform.rotation.z
-            #goal.target_pose.pose.orientation.w = 1 # trans.transform.rotation.w
-#
-            #self.move_base_cancel_publisher.publish(GoalID())
-            #self.rate.sleep()
-            #client.send_goal(goal)
-            #wait = client.wait_for_result()
-            #if not wait:
-            #    rospy.logerr("Action server not available")
-            #else: 
-            #    rospy.loginfo("Successfully sent the goal")
+
+            self.move_base_simple_publisher.publish(target_pose)
 
 
     # Republishes the received omodemetry relative to the odom frame but relative to the nearest anchor available
@@ -202,7 +209,7 @@ class AsaCommander:
         child_frame_id = data.child_frame_id
 
         if(current_parent_frame_id == self.current_anchor_id):
-            rospy.loginfo("Skipped republishing since current anchor id "+ self.current_anchor_id + " is same as sent parent")
+            #rospy.loginfo("Skipped republishing since current anchor id "+ self.current_anchor_id + " is same as sent parent")
             return
 
         self.current_anchor_id = self.find_nearest_anchor()
