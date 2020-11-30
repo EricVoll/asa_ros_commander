@@ -9,8 +9,14 @@ from std_msgs.msg import String
 from geometry_msgs.msg import TransformStamped, Quaternion, PoseStamped
 from nav_msgs.msg import Odometry
 from asa_ros_commander.msg import AsaRelPoseStamped
-from asa_ros_commander.msg import CreatedAnchorMock as CreatedAnchor
-from asa_ros_commander.msg import FoundAnchorMock as FoundAnchor
+
+#for mocking
+#from asa_ros_commander.msg import CreatedAnchorMock as CreatedAnchor
+#from asa_ros_commander.msg import FoundAnchorMock as FoundAnchor
+#for real stuff
+from asa_ros_msgs.msg import CreatedAnchor
+from asa_ros_msgs.msg import FoundAnchor
+
 import time
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from spot_msgs.srv import Trajectory, TrajectoryResponse
@@ -51,8 +57,8 @@ class AsaCommander:
             rospy.Subscriber('spot/odometry', Odometry, self.republish_robot_pos)
 
         # Subscribers listening to the asa ros wrapper
-        rospy.Subscriber('/found_anchor', FoundAnchor, self.asa_found_anchor_callback)
-        rospy.Subscriber('/created_anchor', CreatedAnchor, self.asa_created_anchor_callback)
+        rospy.Subscriber('/asa_ros/found_anchor', FoundAnchor, self.asa_found_anchor_callback)
+        rospy.Subscriber('/asa_ros/created_anchor', CreatedAnchor, self.asa_created_anchor_callback)
 
         rospy.loginfo("Initialized asa_ros_commander")       
 
@@ -92,6 +98,15 @@ class AsaCommander:
 
     # Adds the created anchors id to the available id list if it succeeded
     def asa_created_anchor_callback(self, data):
+        
+        mocking = True
+        if(mocking):
+            rospy.loginfo("Did add anchor from created anchor since I am in debug mode")
+        else:
+            rospy.loginfo("Did not add created anchor, since no tf frame was created from that")
+            return
+
+        # if we wanted to add it here, that would be the code:
         if(data.success):
             self.add_asa_frame(data.anchor_id)
         else:
@@ -105,6 +120,9 @@ class AsaCommander:
         if(anchor_id == "mocked_0"):
             #reset the list
             self.anchors = []
+
+        if(len(self.anchors) == 0):
+            rospy.loginfo("Added first anchor!")
 
         #overwrite the default the first time we receive an anchor
         if self.current_anchor_id == self.root_frame:
@@ -177,7 +195,7 @@ class AsaCommander:
 
             # build trajectory command
             rospy.loginfo("Marked goal. Sleep.")
-            rospy.sleep(4)
+            #rospy.sleep(4)
             rospy.loginfo("Starting command.")
             trajectory = Trajectory()
             trajectory.target_pose = target_pose

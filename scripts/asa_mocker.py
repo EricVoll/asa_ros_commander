@@ -20,8 +20,8 @@ class AsaAnchorMocker:
         self.tf_Buffer = tf.Buffer(rospy.Duration(10))
         self.rate = rospy.Rate(10.0)
         self.anchors = []
-        self.found_anchor_pub = rospy.Publisher('found_anchor', FoundAnchorMock, queue_size=10)
-        self.created_anchor_pub = rospy.Publisher('created_anchor', CreatedAnchorMock, queue_size=10)
+        self.found_anchor_pub = rospy.Publisher('/asa_ros/found_anchor', FoundAnchorMock, queue_size=10)
+        self.created_anchor_pub = rospy.Publisher('/asa_ros/created_anchor', CreatedAnchorMock, queue_size=10)
         self.world_frame_id = "odom"
 
         #add all subscribers needed
