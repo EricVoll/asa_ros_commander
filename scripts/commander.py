@@ -5,6 +5,7 @@
 ## to the 'chatter' topic
 import rospy
 import tf2_ros as tf
+from tf.transformations import *
 from std_msgs.msg import String
 from geometry_msgs.msg import TransformStamped, Quaternion, PoseStamped
 from nav_msgs.msg import Odometry
@@ -23,19 +24,23 @@ from spot_msgs.srv import Trajectory, TrajectoryResponse
 import actionlib
 from actionlib import GoalID
 
+
+
 class AsaCommander:
 
 
     def __init__(self):
+
         rospy.init_node('asa_commander', anonymous=True)
         self.tf_Buffer = tf.Buffer(rospy.Duration(10))
         self.tf_listener = tf.TransformListener(self.tf_Buffer)
         self.tf_broadcaster = tf.TransformBroadcaster()
+        self.tf_static_broadcaster = tf.StaticTransformBroadcaster()
         self.root_frame = "odom"
         self.current_anchor_id = self.root_frame
         self.rate = rospy.Rate(10.0)
         self.anchors = []
-        
+
         self.robot_used = "spot" # {"jackal", "spot"} mainly has influence on which mechanism is used to re-publish the received goal
         
         if(self.robot_used == "jackal"):
@@ -65,9 +70,33 @@ class AsaCommander:
     def spin(self):
         rospy.spin()
 
+
+
+
 #########
 # Utils #
 #########
+
+    # applies a constant rotation to the frame relative to odom
+    def republish_frame_rotated(self, frame_name):
+        rotatedFrameName = frame_name + "_rot"
+        rotatedtrans = self.tf_Buffer.lookup_transform("odom", frame_name, rospy.Time(0))
+        rotation = rotatedtrans.transform.rotation
+
+        quat1 = [-0.5, 0.5, 0.5, 0.5]
+        quat2 = [rotation.x,rotation.y,rotation.z,rotation.w]
+
+        nr = quaternion_multiply(quat2, quat1)
+
+        rotatedtrans.transform.rotation.x = nr[0]
+        rotatedtrans.transform.rotation.y = nr[1]
+        rotatedtrans.transform.rotation.z = nr[2]
+        rotatedtrans.transform.rotation.w = nr[3]
+        rotatedtrans.child_frame_id = rotatedFrameName
+        self.tf_static_broadcaster.sendTransform(rotatedtrans)
+
+        return rotatedFrameName
+
 
     # transforms a post to a transform object
     def pose_to_tf(self, pose, frame_name, parent_frame, time=None):
@@ -94,6 +123,7 @@ class AsaCommander:
 
     # Adds the found anchors id to the available id list
     def asa_found_anchor_callback(self, data):
+        rospy.loginfo(data)
         self.add_asa_frame(data.anchor_id)
 
     # Adds the created anchors id to the available id list if it succeeded
@@ -163,7 +193,7 @@ class AsaCommander:
 
         # create current target frame
         current_goal_frame_id = "current_goal"
-        transform = self.pose_to_tf(data.pose, current_goal_frame_id, data.anchor_id)
+        transform = self.pose_to_tf(data.pose, current_goal_frame_id, data.anchor_id + "_rot")
         self.tf_broadcaster.sendTransform(transform)
 
         target_frame = self.root_frame
@@ -232,14 +262,18 @@ class AsaCommander:
 
         self.current_anchor_id = self.find_nearest_anchor()
 
+        #create rotated anchor
+        rotatedFrameName = self.republish_frame_rotated(self.current_anchor_id)
+
         #Lookup the transform relative to the 
-        try:
+        #try:
             #lookup takes about .1ms
-            trans = self.tf_Buffer.lookup_transform(self.current_anchor_id, child_frame_id, rospy.Time(0))
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            self.rate.sleep()
-            rospy.loginfo("failed once")
-            return
+        trans = self.tf_Buffer.lookup_transform(rotatedFrameName, child_frame_id, rospy.Time(0))
+            #trans = self.tf_Buffer.lookup_transform(self.current_anchor_id, child_frame_id, rospy.Time(0))
+        #except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+        #    self.rate.sleep()
+        #    rospy.loginfo("failed once")
+        #    return
         new_odom = Odometry()
         new_odom.header = data.header
         new_odom.header.frame_id = self.current_anchor_id
@@ -254,7 +288,7 @@ class AsaCommander:
         new_odom.pose.pose.orientation.w = trans.transform.rotation.w
         new_odom.pose.covariance = data.pose.covariance #We are no using covariance at all. Maybe do not set it?
 
-        rospy.loginfo("Republished odom relative to " + self.current_anchor_id + "!")
+        rospy.loginfo("Republished odom relative to " + rotatedFrameName + "!")
 
         self.odom_publisher.publish(new_odom)
 
