@@ -40,6 +40,8 @@ class AsaCommander:
         self.current_anchor_id = self.root_frame
         self.rate = rospy.Rate(10.0)
         self.anchors = []
+        self.last_closest_anchor = None
+        self.mocking = False
 
         self.robot_used = "spot" # {"jackal", "spot"} mainly has influence on which mechanism is used to re-publish the received goal
         
@@ -79,8 +81,10 @@ class AsaCommander:
 
     # applies a constant rotation to the frame relative to odom
     def republish_frame_rotated(self, frame_name):
+        if(self.mocking):
+            return frame_name
         rotatedFrameName = frame_name + "_rot"
-        rotatedtrans = self.tf_Buffer.lookup_transform("odom", frame_name, rospy.Time(0))
+        rotatedtrans = self.tf_Buffer.lookup_transform("odom", frame_name, rospy.Time(0), rospy.Duration(0.1))
         rotation = rotatedtrans.transform.rotation
 
         quat1 = [-0.5, 0.5, 0.5, 0.5]
@@ -152,7 +156,10 @@ class AsaCommander:
             self.anchors = []
 
         if(len(self.anchors) == 0):
-            rospy.loginfo("Added first anchor!")
+            rospy.loginfo("Added first anchor, id = " + anchor_id)
+
+        # republish all incoming frames with their rotated version, since they'll be used from now on.
+        self.republish_frame_rotated(anchor_id)
 
         #overwrite the default the first time we receive an anchor
         if self.current_anchor_id == self.root_frame:
@@ -176,6 +183,11 @@ class AsaCommander:
                 smallestDistance = distance
                 smallestDistanceAnchorId = anchor
 
+        # Check if the closest anchor changed and notify terminal about it.
+        if(self.last_closest_anchor != smallestDistanceAnchorId):
+            rospy.loginfo("changed anchor to " + smallestDistanceAnchorId)
+            self.last_closest_anchor = smallestDistanceAnchorId
+
         return smallestDistanceAnchorId
 
     # returns the distance between the two frames
@@ -189,12 +201,23 @@ class AsaCommander:
 ################
 
     def anchored_goal_callback(self, data):
-        rospy.loginfo(rospy.get_caller_id() + ' Commanding robot relative to the anchor with id %s', data.anchor_id)
+        if(self.mocking):
+            current_anchor_id = data.anchor_id
+        else:
+            current_anchor_id = data.anchor_id + "_rot"
+        rospy.loginfo(rospy.get_caller_id() + ' Commanding robot relative to the anchor with id %s', current_anchor_id)
 
         # create current target frame
         current_goal_frame_id = "current_goal"
-        transform = self.pose_to_tf(data.pose, current_goal_frame_id, data.anchor_id + "_rot")
+        try:
+            transform = self.pose_to_tf(data.pose, current_goal_frame_id, current_anchor_id)
+        except:
+            rospy.loginfo("Could not find transform to anchor_id: " + current_anchor_id)
+            return
+            
         self.tf_broadcaster.sendTransform(transform)
+
+	rospy.sleep(0.3)
 
         target_frame = self.root_frame
         if(self.robot_used == "spot"):
@@ -202,7 +225,7 @@ class AsaCommander:
 
         # lookup transform to odom
         try:
-            trans = self.tf_Buffer.lookup_transform(target_frame, current_goal_frame_id, rospy.Time(0), rospy.Duration(3))
+            trans = self.tf_Buffer.lookup_transform(target_frame, current_goal_frame_id, rospy.Time(0), rospy.Duration(1))
             rospy.loginfo("found tf: %s", trans)
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             rospy.loginfo("Failed to lookup anchor for anchored goal once.")
@@ -225,7 +248,7 @@ class AsaCommander:
 
             # build trajectory command
             rospy.loginfo("Marked goal. Sleep.")
-            #rospy.sleep(4)
+            rospy.sleep(1)
             rospy.loginfo("Starting command.")
             trajectory = Trajectory()
             trajectory.target_pose = target_pose
@@ -263,13 +286,15 @@ class AsaCommander:
         self.current_anchor_id = self.find_nearest_anchor()
 
         #create rotated anchor
-        rotatedFrameName = self.republish_frame_rotated(self.current_anchor_id)
+        if (self.mocking):
+            rotatedFrameName = self.current_anchor_id
+        else:
+            rotatedFrameName = self.current_anchor_id + "_rot"
 
         #Lookup the transform relative to the 
         #try:
             #lookup takes about .1ms
-        trans = self.tf_Buffer.lookup_transform(rotatedFrameName, child_frame_id, rospy.Time(0))
-            #trans = self.tf_Buffer.lookup_transform(self.current_anchor_id, child_frame_id, rospy.Time(0))
+        trans = self.tf_Buffer.lookup_transform(rotatedFrameName, child_frame_id, rospy.Time(0), rospy.Duration(1.0))
         #except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
         #    self.rate.sleep()
         #    rospy.loginfo("failed once")
@@ -288,7 +313,7 @@ class AsaCommander:
         new_odom.pose.pose.orientation.w = trans.transform.rotation.w
         new_odom.pose.covariance = data.pose.covariance #We are no using covariance at all. Maybe do not set it?
 
-        rospy.loginfo("Republished odom relative to " + rotatedFrameName + "!")
+        #rospy.loginfo("Republished odom relative to " + rotatedFrameName + "!")
 
         self.odom_publisher.publish(new_odom)
 
