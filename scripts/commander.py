@@ -216,8 +216,8 @@ class AsaCommander:
             return
             
         self.tf_broadcaster.sendTransform(transform)
-
-	rospy.sleep(0.3)
+        
+        rospy.sleep(0.3)
 
         target_frame = self.root_frame
         if(self.robot_used == "spot"):
@@ -245,10 +245,10 @@ class AsaCommander:
         # republish the StampedPose relative to the base frame
         if(self.robot_used == "spot"):
             # use spot wrapper trajectory service
-
+ 
             # build trajectory command
             rospy.loginfo("Marked goal. Sleep.")
-            rospy.sleep(1)
+            rospy.sleep(.3)
             rospy.loginfo("Starting command.")
             trajectory = Trajectory()
             trajectory.target_pose = target_pose

@@ -1,0 +1,130 @@
+{
+    "$id": "1",
+    "SpatialAnchors": [
+        {
+            "$id": "2",
+            "IsRoot": false,
+            "Id": "cfccf24a-7af1-4110-a039-69fcabe02723",
+            "RelativePoseToParent": {
+                "$id": "3",
+                "X": 0.0,
+                "Y": 0.0,
+                "Z": 0.0,
+                "i": 0.0,
+                "j": 0.0,
+                "k": 0.0,
+                "w": 1.0
+            },
+            "ParentAnchorId": "root"
+        }
+    ],
+    "Waypoints": [
+        {
+            "$id": "4",
+            "$type": "WaypointControl.Waypoint.Waypoint, WaypointControl",
+            "Name": null,
+            "Anchor": {
+                "$ref": "2"
+            },
+            "Pose": {
+                "$id": "5",
+                "$type": "RobotUtilities.Poses.PositionOnly2DPose, RobotUtilities",
+                "X": 0.2,
+                "Y": 0.0,
+                "Z": 0.0,
+                "i": 0.0001183085041702725,
+                "j": -0.053553074598312378,
+                "k": 1.5678069757996127E-05,
+                "w": 0.99856501817703247
+            },
+            "LifetimeId": "2e44e606-692b-4d7c-b457-bfe1192a8d59",
+            "TargetSetTasks": [],
+            "EntryTasks": [],
+            "MainTasks": [],
+            "ExitTasks": []
+        },
+        {
+            "$id": "6",
+            "$type": "WaypointControl.Waypoint.Waypoint, WaypointControl",
+            "Name": null,
+            "Anchor": {
+                "$ref": "2"
+            },
+            "Pose": {
+                "$id": "7",
+                "$type": "RobotUtilities.Poses.PositionOnly2DPose, RobotUtilities",
+                "X": 0.73860436677932739,
+                "Y": 0.0,
+                "Z": 0.492647647857666,
+                "i": 0.00054126116447150707,
+                "j": 0.013981113210320473,
+                "k": 0.00033254717709496617,
+                "w": 0.999902069568634
+            },
+            "LifetimeId": "59967ec6-6e24-4ab4-9be4-9e5163346b93",
+            "TargetSetTasks": [],
+            "EntryTasks": [],
+            "MainTasks": [],
+            "ExitTasks": []
+        },
+        {
+            "$id": "8",
+            "$type": "WaypointControl.Waypoint.Waypoint, WaypointControl",
+            "Name": null,
+            "Anchor": {
+                "$ref": "2"
+            },
+            "Pose": {
+                "$id": "9",
+                "$type": "RobotUtilities.Poses.PositionOnly2DPose, RobotUtilities",
+                "X": -0.1941877007484436,
+                "Y": 0.0,
+                "Z": 1.4624010324478149,
+                "i": 0.000201610557269305,
+                "j": -0.999992311000824,
+                "k": -0.001461350591853261,
+                "w": -0.0036538892891258
+            },
+            "LifetimeId": "82732392-2616-4b9f-9d3a-75a70d998053",
+            "TargetSetTasks": [],
+            "EntryTasks": [],
+            "MainTasks": [],
+            "ExitTasks": []
+        }
+    ],
+    "Edges": [
+        {
+            "$id": "10",
+            "$type": "WaypointControl.Edge.Edge, WaypointControl",
+            "Source": {
+                "$ref": "4"
+            },
+            "Target": {
+                "$ref": "6"
+            }
+        },
+        {
+            "$id": "11",
+            "$type": "WaypointControl.Edge.Edge, WaypointControl",
+            "Source": {
+                "$ref": "6"
+            },
+            "Target": {
+                "$ref": "8"
+            }
+        },
+        {
+            "$id": "11",
+            "$type": "WaypointControl.Edge.Edge, WaypointControl",
+            "Source": {
+                "$ref": "8"
+            },
+            "Target": {
+                "$ref": "4"
+            }
+        }
+    ],
+    "EntryPoint": {
+        "$ref": "4"
+    }
+}
