@@ -164,6 +164,7 @@ include_directories(
    scripts/commander.py
    scripts/asa_mocker.py
    scripts/clock_publisher.py
+   scripts/mission_executer.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
