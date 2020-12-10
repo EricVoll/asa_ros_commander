@@ -17,6 +17,7 @@ from asa_ros_commander.msg import AsaRelPoseStamped
 #for real stuff
 from asa_ros_msgs.msg import CreatedAnchor
 from asa_ros_msgs.msg import FoundAnchor
+from asa_ros_msgs.srv import FindAnchor
 
 import time
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
@@ -38,13 +39,13 @@ class Mission(object):
 class ASAHandler:
     def __init__(self):
         rospy.wait_for_service('asa_ros/find_anchor')
-        self.find_anchor_service = rospy.ServiceProxy('asa_ros/find_anchor', String)
+        self.find_anchor_service = rospy.ServiceProxy('asa_ros/find_anchor', FindAnchor)
 
 
     def find_anchor(self, anchor_id):
         rospy.loginfo("Trying to find anchor with id " + anchor_id)
         msg = "anchor_id: '" + anchor_id + "'"
-        response = self.trajectory_service(msg)
+        response = self.trajectory_service(String(msg))
         rospy.loginfo(response)
 
     def find_anchors(self, anchor_ids):
