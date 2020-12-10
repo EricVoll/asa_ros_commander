@@ -2,5 +2,6 @@
 	<!--<param name="/use_sim_time" value="true" />-->
     <!--Spot-->
     <node pkg="asa_ros_commander" name="mission_executer" type="mission_executer.py" output="screen"/>
+    <include file="$(find asa_ros)/launch/asa_ros.launch"/>
 
 </launch>
