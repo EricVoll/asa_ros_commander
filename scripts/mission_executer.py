@@ -59,10 +59,13 @@ class ASAHandler:
         for id in anchor_ids:
             self.anchor_statusses[id] = False
             self.find_anchor(id)
+        
+        rospy.loginfo(self.anchor_statusses)
 
     def asa_found_anchor_callback(self, anchor):
         #Mark anchor as found
         self.anchor_statusses[anchor.anchor_id] = True
+        rospy.loginfo(self.anchor_statusses)
 
         #Check if we found all requested anchors
         all_anchors_found = True
