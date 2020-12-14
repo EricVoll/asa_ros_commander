@@ -22,11 +22,11 @@ from asa_ros_msgs.srv import FindAnchor
 import time
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from spot_msgs.srv import Trajectory, TrajectoryResponse
-import actionlib
-from actionlib import GoalID
 
 import json
 import pprint
+
+import sys
 
 class Mission(object):
     def __init__(self, jsonString):
@@ -43,6 +43,7 @@ class ASAHandler:
         self.all_anchors_found_callback = None
 
         #publishers, subscribers and services
+        rospy.loginfo("Waiting for service: asa_ros/find_anchor")
         rospy.wait_for_service('asa_ros/find_anchor')
         self.find_anchor_service = rospy.ServiceProxy('asa_ros/find_anchor', FindAnchor)
         rospy.Subscriber('/asa_ros/found_anchor', FoundAnchor, self.asa_found_anchor_callback)
@@ -77,9 +78,7 @@ class ASAHandler:
 
 
 class MissionExecuter:
-    def __init__(self):
-
-        rospy.init_node('mission_executer', anonymous=True) 
+    def __init__(self, mission_file_path, orientation_check_enabled):
 
         # general fields and objects
         self.mission = None
@@ -89,6 +88,7 @@ class MissionExecuter:
         self.current_waypoint = None
         self.current_goal_pose = None
         self.current_anchor_id = None
+        self.orientation_check_enabled = orientation_check_enabled
 
         # ros publishers, subscribers and services
         self.goal_publisher = rospy.Publisher('/anchored_goal', AsaRelPoseStamped, queue_size=10)
@@ -99,7 +99,8 @@ class MissionExecuter:
         self.tf_listener = tf.TransformListener(self.tf_Buffer)
 
         # Mission importer
-        with open('/home/user/catkin_ws/src/asa_ros_commander/scripts/mission.json', 'r') as file:
+        rospy.loginfo("Loading mission " + mission_file_path)
+        with open(mission_file_path, 'r') as file:
             jsonString = file.read().replace('\n', '')
         
         self.load_mission(jsonString)
@@ -219,7 +220,11 @@ class MissionExecuter:
         ori_t = self.current_goal_pose.orientation
         pos = data.pose.pose.position
         ori = data.pose.pose.orientation
-        diff = [pos.x - pos_t.x, pos.y - pos_t.y] #, pos.z - pos_t.z, ori.x - ori_t.x, ori.y - ori_t.y, ori.z - ori_t.z, ori.w - ori_t.w
+        if(self.orientation_check_enabled):
+            diff = [pos.x - pos_t.x, pos.y - pos_t.y, ori.x - ori_t.x, ori.y - ori_t.y, ori.z - ori_t.z, ori.w - ori_t.w]
+        else:
+            diff = [pos.x - pos_t.x, pos.y - pos_t.y] #, pos.z - pos_t.z, ori.x - ori_t.x, ori.y - ori_t.y, ori.z - ori_t.z, ori.w - ori_t.w
+
         square = 0
         for v in diff:
             square += v**2
@@ -237,5 +242,11 @@ class MissionExecuter:
 
 
 if __name__ == '__main__':
-    executer = MissionExecuter()
+    rospy.init_node('mission_executer', anonymous=True) 
+    
+    myargv = rospy.myargv(argv = sys.argv)
+    if(len(myargv) < 3):
+        rospy.logerr("Missing argument for the mission_executer! Usage: mission_executer.py 'mission_file_path:string' 'orientation_check_enabled:bool")
+
+    executer = MissionExecuter(myargv[1], myargv[2])
     executer.spin()

@@ -1,8 +1,11 @@
 <launch>
-	<!--<param name="/use_sim_time" value="true" />-->
-    <!--Spot-->
+	<arg name="mission_file_path" default="/home/user/catkin_ws/src/asa_ros_commander/scripts/mission.json" />
+	<arg name="orientation_check_enabled" default="True" />
+
     <node pkg="asa_ros_commander" name="asa_ros_commander" type="commander.py" output="screen"/>
-    <node pkg="asa_ros_commander" name="mission_executer" type="mission_executer.py" output="screen"/>
+    <node pkg="asa_ros_commander" name="mission_executer" type="mission_executer.py" output="screen" 
+        args="$(arg mission_file_path) $(arg orientation_check_enabled)"/>
+
     <include file="$(find spot_driver)/launch/driver.launch"/>
     <include file="$(find asa_ros)/launch/asa_ros.launch"/>
     <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" />
