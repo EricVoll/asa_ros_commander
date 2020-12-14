@@ -78,7 +78,19 @@ class ASAHandler:
 
 
 class MissionExecuter:
-    def __init__(self, mission_file_path, orientation_check_enabled):
+    def __init__(self):
+        rospy.init_node('mission_executer', anonymous=True) 
+
+        myargv = rospy.myargv(argv = sys.argv)
+        if(len(myargv) < 5):
+            rospy.logerr("Missing argument for the mission_executer! Usage: mission_executer.py 'mission_file_path:string' 'orientation_check_enabled:bool' 'tolerance_rotation:float' 'tolerance_translation:float'")
+
+        self.options = {
+            "mission_file_path" : myargv[1],
+            "orientation_check_enabled" : myargv[2] == 'True',
+            "tolerance_rotation" : float(myargv[3]),
+            "tolerance_translation" : float(myargv[4])
+        }
 
         # general fields and objects
         self.mission = None
@@ -88,7 +100,7 @@ class MissionExecuter:
         self.current_waypoint = None
         self.current_goal_pose = None
         self.current_anchor_id = None
-        self.orientation_check_enabled = orientation_check_enabled
+        self.orientation_check_enabled = self.options["orientation_check_enabled"]
 
         # ros publishers, subscribers and services
         self.goal_publisher = rospy.Publisher('/anchored_goal', AsaRelPoseStamped, queue_size=10)
@@ -99,6 +111,7 @@ class MissionExecuter:
         self.tf_listener = tf.TransformListener(self.tf_Buffer)
 
         # Mission importer
+        mission_file_path = self.options["mission_file_path"]
         rospy.loginfo("Loading mission " + mission_file_path)
         with open(mission_file_path, 'r') as file:
             jsonString = file.read().replace('\n', '')
@@ -220,33 +233,34 @@ class MissionExecuter:
         ori_t = self.current_goal_pose.orientation
         pos = data.pose.pose.position
         ori = data.pose.pose.orientation
-        if(self.orientation_check_enabled):
-            diff = [pos.x - pos_t.x, pos.y - pos_t.y, ori.x - ori_t.x, ori.y - ori_t.y, ori.z - ori_t.z, ori.w - ori_t.w]
-        else:
-            diff = [pos.x - pos_t.x, pos.y - pos_t.y] #, pos.z - pos_t.z, ori.x - ori_t.x, ori.y - ori_t.y, ori.z - ori_t.z, ori.w - ori_t.w
+            
+        distance_err = self.CalcL2([pos.x, pos.y], [pos_t.x, pos_t.y])
+        rotation_err = 0
 
-        square = 0
-        for v in diff:
-            square += v**2
-        distance = square**0.5
+        if(self.options["orientation_check_enabled"]):
+            #Quaternions represent an equal rotation if q1 = q2, or if q1 = -q2
+            rotation_err_1 = self.CalcL2([ori.x, ori.y, ori.z, ori.w], [ori_t.x, ori_t.y, ori_t.z, ori_t.w])
+            rotation_err_2 = self.CalcL2([ori.x, ori.y, ori.z, ori.w], [ori_t.x, ori_t.y, ori_t.z, ori_t.w], -1)
+            rotation_err = rotation_err_1 if rotation_err_1 < rotation_err_2 else rotation_err_2
 
         #rospy.loginfo("Target: %s", pos_t)
         #rospy.loginfo("Current: %s", pos)
-        #rospy.loginfo("Target rot: %s", ori_t)
-        #rospy.loginfo("Current rot: %s", ori)
-        #rospy.loginfo("Current distance is %s", distance)
+        rospy.loginfo("Target rot: %s", ori_t)
+        rospy.loginfo("Current rot: %s", ori)
+        rospy.loginfo("Current distance is %s", distance_err)
+        rospy.loginfo("Current rotation error is %s", rotation_err)
 
-        if(distance < 0.25):
+        if(distance_err < self.options["tolerance_translation"] and rotation_err < self.options["tolerance_rotation"] ):
             rospy.sleep(2)
             self.perform_step()
 
+    def CalcL2(self, arr1, arr2, factor = 1):
+        square = 0
+        for i in range(len(arr1)):
+            square += (arr1[i]-arr2[i]*factor)**2
+        return square**0.5
+
 
 if __name__ == '__main__':
-    rospy.init_node('mission_executer', anonymous=True) 
-    
-    myargv = rospy.myargv(argv = sys.argv)
-    if(len(myargv) < 3):
-        rospy.logerr("Missing argument for the mission_executer! Usage: mission_executer.py 'mission_file_path:string' 'orientation_check_enabled:bool")
-
-    executer = MissionExecuter(myargv[1], myargv[2])
+    executer = MissionExecuter()
     executer.spin()

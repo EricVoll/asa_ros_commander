@@ -2,7 +2,7 @@
 	<!--<param name="/use_sim_time" value="true" />-->
     <!--Spot-->
 
-	<arg name="mock_asa" default="true" />
+	<arg name="mock_asa" default="False" />
     <arg name="robot_name" default="spot" /> <!--{"spot", "jackal"}-->
 	<arg name="command_delay" default="0.3" />
     

@@ -41,8 +41,8 @@ class AsaCommander:
 
         self.options = {
             "robot_name": myargv[1],
-            "mocking_anchors": myargv[2],
-            "command_delay": myargv[3]
+            "mocking_anchors": myargv[2] == 'True',
+            "command_delay": float(myargv[3])
         }
         
         #tf setup
