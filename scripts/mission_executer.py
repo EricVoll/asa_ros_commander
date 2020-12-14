@@ -65,14 +65,9 @@ class ASAHandler:
     def asa_found_anchor_callback(self, anchor):
         #Mark anchor as found
         self.anchor_statusses[anchor.anchor_id] = True
-        rospy.loginfo(self.anchor_statusses)
 
         #Check if we found all requested anchors
-        all_anchors_found = True
-        for anchor_found in self.anchor_statusses.values():
-            if(anchor_found == False):
-                all_anchors_found == False
-                break
+        all_anchors_found = all(x == True for x in self.anchor_statusses.values())
 
         if(all_anchors_found):
             self.all_anchors_found_callback()
@@ -265,5 +260,6 @@ class MissionExecuter:
 
 
 if __name__ == '__main__':
+
     executer = MissionExecuter()
     executer.spin()
