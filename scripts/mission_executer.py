@@ -41,6 +41,7 @@ class ASAHandler:
         #fields
         self.anchor_statusses = {}
         self.all_anchors_found_callback = None
+        self.current_anchor_find_index = 0
 
         #publishers, subscribers and services
         rospy.loginfo("Waiting for service: asa_ros/find_anchor")
@@ -58,7 +59,10 @@ class ASAHandler:
         self.all_anchors_found_callback = found_all_callback
         for id in anchor_ids:
             self.anchor_statusses[id] = False
-            self.find_anchor(id)
+            #self.find_anchor(id)
+
+        #find first anchor
+        self.find_anchor(anchor_ids[0])
 
     def asa_found_anchor_callback(self, anchor):
         #Mark anchor as found
@@ -72,6 +76,9 @@ class ASAHandler:
         else:
             rospy.loginfo("Will continue to look for other anchors:")
             rospy.loginfo(self.anchor_statusses)
+
+            self.current_anchor_find_index += 1
+            self.find_anchor(self.anchor_statusses.keys()[self.current_anchor_find_index])
         
 
 
