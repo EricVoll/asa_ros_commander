@@ -24,6 +24,7 @@ from spot_msgs.srv import Trajectory, TrajectoryResponse
 import actionlib
 from actionlib import GoalID
 
+import sys
 
 
 class AsaCommander:
@@ -32,24 +33,36 @@ class AsaCommander:
     def __init__(self):
 
         rospy.init_node('asa_commander', anonymous=True)
+
+        # check arguments
+        myargv = rospy.myargv(argv = sys.argv)
+        if(len(myargv) < 4):
+            rospy.logerr("Missing argument for the commander.py script! Usage 'robot_name:string' 'mocking_anchors:bool' 'command_delay:float'")
+
+        self.options = {
+            "robot_name": myargv[1],
+            "mocking_anchors": myargv[2],
+            "command_delay": myargv[3]
+        }
+        
+        #tf setup
         self.tf_Buffer = tf.Buffer(rospy.Duration(10))
         self.tf_listener = tf.TransformListener(self.tf_Buffer)
         self.tf_broadcaster = tf.TransformBroadcaster()
         self.tf_static_broadcaster = tf.StaticTransformBroadcaster()
+
         self.root_frame = "odom"
         self.current_anchor_id = self.root_frame
         self.rate = rospy.Rate(10.0)
         self.anchors = []
         self.last_closest_anchor = None
-        self.mocking = False
-
-        self.robot_used = "spot" # {"jackal", "spot"} mainly has influence on which mechanism is used to re-publish the received goal
+        self.mocking = self.options["mocking_anchors"]
+        self.robot_used = self.options["robot_name"] # {"jackal", "spot"} mainly has influence on which mechanism is used to re-publish the received goal
         
         if(self.robot_used == "jackal"):
             self.robot_frame = "base_link"
         elif(self.robot_used =="spot"):
             self.robot_frame = "body"
-
         
         # All publishers
         self.odom_publisher = rospy.Publisher('/odometry/filtered/asa_relative', Odometry, queue_size=10)
@@ -248,7 +261,7 @@ class AsaCommander:
  
             # build trajectory command
             rospy.loginfo("Marked goal. Sleep.")
-            rospy.sleep(.3)
+            rospy.sleep(self.options["command_delay"])
             rospy.loginfo("Starting command.")
             trajectory = Trajectory()
             trajectory.target_pose = target_pose
@@ -269,7 +282,7 @@ class AsaCommander:
 
             # create StampedPose from transform
             self.move_base_cancel_publisher.publish(GoalID())
-            rospy.sleep(.1)
+            rospy.sleep(self.options["command_delay"])
 
             self.move_base_simple_publisher.publish(target_pose)
 
@@ -292,13 +305,7 @@ class AsaCommander:
             rotatedFrameName = self.current_anchor_id + "_rot"
 
         #Lookup the transform relative to the 
-        #try:
-            #lookup takes about .1ms
         trans = self.tf_Buffer.lookup_transform(rotatedFrameName, child_frame_id, rospy.Time(0), rospy.Duration(1.0))
-        #except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-        #    self.rate.sleep()
-        #    rospy.loginfo("failed once")
-        #    return
         new_odom = Odometry()
         new_odom.header = data.header
         new_odom.header.frame_id = self.current_anchor_id
@@ -313,11 +320,12 @@ class AsaCommander:
         new_odom.pose.pose.orientation.w = trans.transform.rotation.w
         new_odom.pose.covariance = data.pose.covariance #We are no using covariance at all. Maybe do not set it?
 
-        #rospy.loginfo("Republished odom relative to " + rotatedFrameName + "!")
-
         self.odom_publisher.publish(new_odom)
 
 
 if __name__ == '__main__':
+
+
+
     commander = AsaCommander()
     commander.spin()

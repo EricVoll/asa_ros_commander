@@ -3,11 +3,16 @@
     <!--Spot-->
 
 	<arg name="mock_asa" default="true" />
+    <arg name="robot_name" default="spot" /> <!--{"spot", "jackal"}-->
+	<arg name="command_delay" default="0.3" />
+    
 
     <include file="$(find spot_driver)/launch/driver.launch"/>
 
     <node pkg="asa_ros_commander" name="asa_ros_mocker" type="asa_mocker.py" output="screen" if="$(arg mock_asa)"/>
-    <node pkg="asa_ros_commander" name="asa_ros_commander" type="commander.py" output="screen"/>
+    <node pkg="asa_ros_commander" name="asa_ros_commander" type="commander.py" output="screen"
+        args="$(arg robot_name) $(arg mock_asa) $(arg command_delay)"
+    />
     <node pkg="asa_ros_commander" name="asa_ros_clock_publisher" type="clock_publisher.py" output="screen"/>
     
     <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" />
