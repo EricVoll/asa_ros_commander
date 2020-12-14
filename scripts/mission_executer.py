@@ -245,10 +245,10 @@ class MissionExecuter:
 
         #rospy.loginfo("Target: %s", pos_t)
         #rospy.loginfo("Current: %s", pos)
-        rospy.loginfo("Target rot: %s", ori_t)
-        rospy.loginfo("Current rot: %s", ori)
-        rospy.loginfo("Current distance is %s", distance_err)
-        rospy.loginfo("Current rotation error is %s", rotation_err)
+        #rospy.loginfo("Target rot: %s", ori_t)
+        #rospy.loginfo("Current rot: %s", ori)
+        #rospy.loginfo("Current distance is %s", distance_err)
+        #rospy.loginfo("Current rotation error is %s", rotation_err)
 
         if(distance_err < self.options["tolerance_translation"] and rotation_err < self.options["tolerance_rotation"] ):
             rospy.sleep(2)
