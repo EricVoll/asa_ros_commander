@@ -59,8 +59,6 @@ class ASAHandler:
         for id in anchor_ids:
             self.anchor_statusses[id] = False
             self.find_anchor(id)
-        
-        rospy.loginfo(self.anchor_statusses)
 
     def asa_found_anchor_callback(self, anchor):
         #Mark anchor as found
@@ -71,6 +69,9 @@ class ASAHandler:
 
         if(all_anchors_found):
             self.all_anchors_found_callback()
+        else:
+            rospy.loginfo("Will continue to look for other anchors:")
+            rospy.loginfo(self.anchor_statusses)
         
 
 
@@ -215,6 +216,11 @@ class MissionExecuter:
     # receives the current position of the robot and compares it to the current target.
     # Triggers a state machine step if the target is reached
     def robot_position_updated(self, data):
+
+        if(self.current_anchor_id == None):
+            # we are still waiting for the other anchors to be found
+            return
+
         # lookup transform relative to current_anchor
         #if(data.header.frame_id != self.current_anchor_id):
         transform = self.tf_Buffer.lookup_transform(self.current_anchor_id + "_rot", "body", rospy.Time(0), rospy.Duration(0.1))
