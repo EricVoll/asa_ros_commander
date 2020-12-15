@@ -125,9 +125,13 @@ class MissionExecuter:
         # Mission importer
 
         if(self.options["load_mission_from_cosmos_db"]):
+            masterKey = ""
+            with open("/home/user/catkin_ws/src/asa_ros_commander/config/db_master_key.file", 'r') as file:
+                masterKey = file.read()
+
             self.load_mission_from_cosmos_db(
                 "https://mr-spot-control-mission-db-v2.documents.azure.com:443",
-                "ha1e0ZI4thLnjgCY8HI1iJbQTxG7z7UKh7TXvxFe1HOVwkdhRQ1BfMQOOTjKbs4JgROOL2lLmbkSyeOa2XmzwA==",
+                masterKey,
                 self.options["mission_file_path_or_id"]
             )
         else:
