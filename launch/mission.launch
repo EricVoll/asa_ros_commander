@@ -1,8 +1,10 @@
 <launch>
-	<arg name="mission_file_path" default="/home/user/catkin_ws/src/asa_ros_commander/scripts/mission.json" />
+	<!--<arg name="mission_file_path_or_id" default="/home/user/catkin_ws/src/asa_ros_commander/scripts/mission.json" />-->
+	<arg name="mission_file_path_or_id" default="15.12.2020_056" />
 	<arg name="orientation_check_enabled" default="True" />
 	<arg name="tolerance_translation" default="0.1" />
 	<arg name="tolerance_rotation" default="0.1" />
+	<arg name="load_mission_from_cosmos_db" default="True" />
     
 	<arg name="mock_asa" default="False" />
     <arg name="robot_name" default="spot" /> <!--{"spot", "jackal"}-->
@@ -13,7 +15,7 @@
         args="$(arg robot_name) $(arg mock_asa) $(arg command_delay)"
     />
     <node pkg="asa_ros_commander" name="mission_executer" type="mission_executer.py" output="screen" 
-        args="$(arg mission_file_path) $(arg orientation_check_enabled) $(arg tolerance_rotation) $(arg tolerance_translation)"/>
+        args="$(arg mission_file_path_or_id) $(arg orientation_check_enabled) $(arg tolerance_rotation) $(arg tolerance_translation) $(arg load_mission_from_cosmos_db)"/>
 
     <include file="$(find spot_driver)/launch/driver.launch"/>
     <include file="$(find asa_ros)/launch/asa_ros.launch"/>

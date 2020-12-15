@@ -28,6 +28,8 @@ import pprint
 
 import sys
 
+from azure.cosmos import exceptions, CosmosClient, PartitionKey
+
 class Mission(object):
     def __init__(self, jsonString):
         self.__dict__.update(json.loads(jsonString))
@@ -91,14 +93,16 @@ class MissionExecuter:
 
         myargv = rospy.myargv(argv = sys.argv)
         if(len(myargv) < 5):
-            rospy.logerr("Missing argument for the mission_executer! Usage: mission_executer.py 'mission_file_path:string' 'orientation_check_enabled:bool' 'tolerance_rotation:float' 'tolerance_translation:float'")
+            rospy.logerr("Missing argument for the mission_executer! Usage: mission_executer.py 'mission_file_path_or_id:string' 'orientation_check_enabled:bool' 'tolerance_rotation:float' 'tolerance_translation:float' 'load_mission_from_cosmos_db:bool'")
 
         self.options = {
-            "mission_file_path" : myargv[1],
+            "mission_file_path_or_id" : myargv[1],
             "orientation_check_enabled" : myargv[2] == 'True',
             "tolerance_rotation" : float(myargv[3]),
-            "tolerance_translation" : float(myargv[4])
+            "tolerance_translation" : float(myargv[4]),
+            "load_mission_from_cosmos_db" : myargv[5] == 'True'
         }
+
 
         # general fields and objects
         self.mission = None
@@ -119,12 +123,19 @@ class MissionExecuter:
         self.tf_listener = tf.TransformListener(self.tf_Buffer)
 
         # Mission importer
-        mission_file_path = self.options["mission_file_path"]
-        rospy.loginfo("Loading mission " + mission_file_path)
-        with open(mission_file_path, 'r') as file:
-            jsonString = file.read().replace('\n', '')
-        
-        self.load_mission(jsonString)
+
+        if(self.options["load_mission_from_cosmos_db"]):
+            self.load_mission_from_cosmos_db(
+                "https://mr-spot-control-mission-db-v2.documents.azure.com:443",
+                "ha1e0ZI4thLnjgCY8HI1iJbQTxG7z7UKh7TXvxFe1HOVwkdhRQ1BfMQOOTjKbs4JgROOL2lLmbkSyeOa2XmzwA==",
+                self.options["mission_file_path_or_id"]
+            )
+        else:
+            mission_file_path = self.options["mission_file_path_or_id"]
+            rospy.loginfo("Loading mission " + mission_file_path)
+            with open(mission_file_path, 'r') as file:
+                jsonString = file.read().replace('\n', '')
+            self.load_mission(jsonString)
 
         # Kick off anchor finding
         self.asa_handler.find_anchors(self.mission.get_anchor_ids(), self.all_anchors_found_callback)
@@ -151,6 +162,22 @@ class MissionExecuter:
             else:
                 waypoint["anchor_id"] = anchor["Id"]
 
+    def load_mission_from_cosmos_db(self, endpoint, masterkey, mission_id):
+        client = CosmosClient(endpoint, masterkey)
+        database_name = 'missions'
+        database = client.create_database_if_not_exists(id=database_name)
+        container_name = 'stored'
+        container = database.create_container_if_not_exists(
+            id = container_name,
+            partition_key = PartitionKey(path="/fakePartitionKey"),
+            offer_throughput=400
+        )
+
+        item_response = container.read_item(item=mission_id, partition_key="fakePartitionKey")
+        request_charge = container.client_connection.last_response_headers['x-ms-request-charge']
+        print('COSMOS DB: item fetched with id {0}. Operation consumed {1} request units'.format(item_response['id'], (request_charge)))
+
+        self.load_mission(item_response["json"])
 
 #########
 # Utils #
