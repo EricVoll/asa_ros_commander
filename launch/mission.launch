@@ -5,6 +5,7 @@
 	<arg name="tolerance_translation" default="0.1" />
 	<arg name="tolerance_rotation" default="0.1" />
 	<arg name="load_mission_from_cosmos_db" default="True" />
+	<arg name="cosmos_db_master_key_file" default="/home/user/catkin_ws/src/asa_ros_commander/config/masterkey.file" />
     
 	<arg name="mock_asa" default="False" />
     <arg name="robot_name" default="spot" /> <!--{"spot", "jackal"}-->
@@ -15,7 +16,7 @@
         args="$(arg robot_name) $(arg mock_asa) $(arg command_delay)"
     />
     <node pkg="asa_ros_commander" name="mission_executer" type="mission_executer.py" output="screen" 
-        args="$(arg mission_file_path_or_id) $(arg orientation_check_enabled) $(arg tolerance_rotation) $(arg tolerance_translation) $(arg load_mission_from_cosmos_db)"/>
+        args="$(arg mission_file_path_or_id) $(arg orientation_check_enabled) $(arg tolerance_rotation) $(arg tolerance_translation) $(arg load_mission_from_cosmos_db) $(arg cosmos_db_master_key_file)"/>
 
     <include file="$(find spot_driver)/launch/driver.launch"/>
     <include file="$(find asa_ros)/launch/asa_ros.launch"/>

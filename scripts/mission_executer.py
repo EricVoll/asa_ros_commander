@@ -92,7 +92,7 @@ class MissionExecuter:
         rospy.init_node('mission_executer', anonymous=True) 
 
         myargv = rospy.myargv(argv = sys.argv)
-        if(len(myargv) < 5):
+        if(len(myargv) < 6):
             rospy.logerr("Missing argument for the mission_executer! Usage: mission_executer.py 'mission_file_path_or_id:string' 'orientation_check_enabled:bool' 'tolerance_rotation:float' 'tolerance_translation:float' 'load_mission_from_cosmos_db:bool'")
 
         self.options = {
@@ -102,6 +102,12 @@ class MissionExecuter:
             "tolerance_translation" : float(myargv[4]),
             "load_mission_from_cosmos_db" : myargv[5] == 'True'
         }
+
+        if(self.options["load_mission_from_cosmos_db"]):
+            if(len(myargv) < 7):
+                rospy.logerr("Missing argument for the mission_executer! The last argument must be set if comsos db is used. Usage: mission_executer.py 'mission_file_path_or_id:string' 'orientation_check_enabled:bool' 'tolerance_rotation:float' 'tolerance_translation:float' 'load_mission_from_cosmos_db:bool'  'cosmos_db_master_key_file:string' ")
+
+            self.options["comsos_db_master_key_file"] = myargv[6]
 
 
         # general fields and objects
@@ -126,7 +132,7 @@ class MissionExecuter:
 
         if(self.options["load_mission_from_cosmos_db"]):
             masterKey = ""
-            with open("/home/user/catkin_ws/src/asa_ros_commander/config/db_master_key.file", 'r') as file:
+            with open(self.options["comsos_db_master_key_file"], 'r') as file:
                 masterKey = file.read()
 
             self.load_mission_from_cosmos_db(
